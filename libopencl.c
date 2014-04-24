@@ -53,6 +53,7 @@ static void open_libopencl_so()
         {
             if(access_file(default_so_paths[i])) {
                 path = (char *)default_so_paths[i];
+				break;
             }
         }
     }
