@@ -13,7 +13,7 @@
 
 
 static const char *default_so_paths[] = { // Android
-                                            "/system/lib/libOpenCL.so", "/system/vendor/lib/libOpenCL.so"
+                                            "/system/lib/libOpenCL.so", "/system/vendor/lib/libOpenCL.so",
                                             "/data/data/org.pocl.libs/files/lib/libpocl.so",
                                           // Linux
                                             "/usr/lib/libOpenCL.so", "/usr/local/lib/libOpenCL.so",
