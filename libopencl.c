@@ -1,6 +1,6 @@
 /*
  *   Stub libopencl that dlsyms into actual library based on environment variable
- *   
+ *
  *   LIBOPENCL_SO_PATH      -- Path to opencl so that will be searched first
  *   LIBOPENCL_SO_PATH_2    -- Searched second
  *   LIBOPENCL_SO_PATH_3    -- Searched third
@@ -14,10 +14,12 @@
 
 static const char *default_so_paths[] = { // Android
                                             "/system/lib/libOpenCL.so", "/system/vendor/lib/libOpenCL.so",
+                                            "/system/vendor/lib/egl/libGLES_mali.so",
                                             "/data/data/org.pocl.libs/files/lib/libpocl.so",
                                           // Linux
                                             "/usr/lib/libOpenCL.so", "/usr/local/lib/libOpenCL.so",
-                                            "/usr/local/lib/libpocl.so"
+                                            "/usr/local/lib/libpocl.so",
+                                            "/usr/lib64/libOpenCL.so", "/usr/lib32/libOpenCL.so"
                                           };
 
 static void *so_handle = NULL;
@@ -25,8 +27,8 @@ static void *so_handle = NULL;
 
 static int access_file(const char *filename)
 {
-  struct stat buffer;   
-  return (stat(filename, &buffer) == 0);
+    struct stat buffer;
+    return (stat(filename, &buffer) == 0);
 }
 
 static void open_libopencl_so()
@@ -36,7 +38,7 @@ static void open_libopencl_so()
 
     if((str=getenv("LIBOPENCL_SO_PATH")) && access_file(str)) {
         path = str;
-    } 
+    }
     else if((str=getenv("LIBOPENCL_SO_PATH_2")) && access_file(str)) {
         path = str;
     }
@@ -84,10 +86,10 @@ clGetPlatformIDs(cl_uint          num_entries,
 }
 
 
-cl_int 
-clGetPlatformInfo(cl_platform_id   platform, 
+cl_int
+clGetPlatformInfo(cl_platform_id   platform,
                   cl_platform_info param_name,
-                  size_t           param_value_size, 
+                  size_t           param_value_size,
                   void *           param_value,
                   size_t *         param_value_size_ret)
 {
@@ -107,11 +109,11 @@ clGetPlatformInfo(cl_platform_id   platform,
 
 cl_int
 clGetDeviceIDs(cl_platform_id   platform,
-               cl_device_type   device_type, 
-               cl_uint          num_entries, 
-               cl_device_id *   devices, 
+               cl_device_type   device_type,
+               cl_uint          num_entries,
+               cl_device_id *   devices,
                cl_uint *        num_devices)
-{    
+{
     f_clGetDeviceIDs func;
 
     if(!so_handle)
@@ -127,8 +129,8 @@ clGetDeviceIDs(cl_platform_id   platform,
 
 cl_int
 clGetDeviceInfo(cl_device_id    device,
-                cl_device_info  param_name, 
-                size_t          param_value_size, 
+                cl_device_info  param_name,
+                size_t          param_value_size,
                 void *          param_value,
                 size_t *        param_value_size_ret)
 {
@@ -144,7 +146,7 @@ clGetDeviceInfo(cl_device_id    device,
         return CL_INVALID_PLATFORM;
     }
 }
-    
+
 cl_int
 clCreateSubDevices(cl_device_id                         in_device,
                    const cl_device_partition_property * properties,
@@ -180,7 +182,7 @@ clRetainDevice(cl_device_id device)
         return CL_INVALID_PLATFORM;
     }
 }
-    
+
 cl_int
 clReleaseDevice(cl_device_id device)
 {
@@ -196,7 +198,7 @@ clReleaseDevice(cl_device_id device)
         return CL_INVALID_PLATFORM;
     }
 }
-    
+
 
 cl_context
 clCreateContext(const cl_context_properties * properties,
@@ -272,10 +274,10 @@ clReleaseContext(cl_context context)
 }
 
 cl_int
-clGetContextInfo(cl_context         context, 
-                 cl_context_info    param_name, 
-                 size_t             param_value_size, 
-                 void *             param_value, 
+clGetContextInfo(cl_context         context,
+                 cl_context_info    param_name,
+                 size_t             param_value_size,
+                 void *             param_value,
                  size_t *           param_value_size_ret)
 {
     f_clGetContextInfo func;
@@ -294,8 +296,8 @@ clGetContextInfo(cl_context         context,
 
 
 cl_command_queue
-clCreateCommandQueue(cl_context                     context, 
-                     cl_device_id                   device, 
+clCreateCommandQueue(cl_context                     context,
+                     cl_device_id                   device,
                      cl_command_queue_properties    properties,
                      cl_int *                       errcode_ret)
 {
@@ -411,7 +413,7 @@ cl_mem
 clCreateImage(cl_context              context,
               cl_mem_flags            flags,
               const cl_image_format * image_format,
-              const cl_image_desc *   image_desc, 
+              const cl_image_desc *   image_desc,
               void *                  host_ptr,
               cl_int *                errcode_ret)
 {
@@ -428,7 +430,7 @@ clCreateImage(cl_context              context,
         return NULL;
     }
 }
-                        
+
 cl_int
 clRetainMemObject(cl_mem memobj)
 {
@@ -482,10 +484,10 @@ clGetSupportedImageFormats(cl_context           context,
         return CL_INVALID_PLATFORM;
     }
 }
-                                    
+
 cl_int
 clGetMemObjectInfo(cl_mem           memobj,
-                   cl_mem_info      param_name, 
+                   cl_mem_info      param_name,
                    size_t           param_value_size,
                    void *           param_value,
                    size_t *         param_value_size_ret)
@@ -506,7 +508,7 @@ clGetMemObjectInfo(cl_mem           memobj,
 
 cl_int
 clGetImageInfo(cl_mem           image,
-               cl_image_info    param_name, 
+               cl_image_info    param_name,
                size_t           param_value_size,
                void *           param_value,
                size_t *         param_value_size_ret)
@@ -526,8 +528,8 @@ clGetImageInfo(cl_mem           image,
 }
 
 cl_int
-clSetMemObjectDestructorCallback(  cl_mem memobj, 
-                                    void (*pfn_notify)( cl_mem memobj, void* user_data), 
+clSetMemObjectDestructorCallback(  cl_mem memobj,
+                                    void (*pfn_notify)( cl_mem memobj, void* user_data),
                                     void * user_data )
 {
     f_clSetMemObjectDestructorCallback func;
@@ -545,8 +547,8 @@ clSetMemObjectDestructorCallback(  cl_mem memobj,
 
 cl_sampler
 clCreateSampler(cl_context          context,
-                cl_bool             normalized_coords, 
-                cl_addressing_mode  addressing_mode, 
+                cl_bool             normalized_coords,
+                cl_addressing_mode  addressing_mode,
                 cl_filter_mode      filter_mode,
                 cl_int *            errcode_ret)
 {
@@ -716,7 +718,7 @@ cl_int
 clBuildProgram(cl_program           program,
                cl_uint              num_devices,
                const cl_device_id * device_list,
-               const char *         options, 
+               const char *         options,
                void (*pfn_notify)(cl_program program, void * user_data),
                void *               user_data)
 {
@@ -737,7 +739,7 @@ cl_int
 clCompileProgram(cl_program           program,
                  cl_uint              num_devices,
                  const cl_device_id * device_list,
-                 const char *         options, 
+                 const char *         options,
                  cl_uint              num_input_headers,
                  const cl_program *   input_headers,
                  const char **        header_include_names,
@@ -762,7 +764,7 @@ cl_program
 clLinkProgram(cl_context           context,
               cl_uint              num_devices,
               const cl_device_id * device_list,
-              const char *         options, 
+              const char *         options,
               cl_uint              num_input_programs,
               const cl_program *   input_programs,
               void (*pfn_notify)(cl_program program, void * user_data),
@@ -1177,7 +1179,7 @@ clEnqueueReadBuffer(cl_command_queue    command_queue,
                     cl_mem              buffer,
                     cl_bool             blocking_read,
                     size_t              offset,
-                    size_t              size, 
+                    size_t              size,
                     void *              ptr,
                     cl_uint             num_events_in_wait_list,
                     const cl_event *    event_wait_list,
@@ -1202,12 +1204,12 @@ clEnqueueReadBufferRect(cl_command_queue    command_queue,
                         cl_mem              buffer,
                         cl_bool             blocking_read,
                         const size_t *      buffer_offset,
-                        const size_t *      host_offset, 
+                        const size_t *      host_offset,
                         const size_t *      region,
                         size_t              buffer_row_pitch,
                         size_t              buffer_slice_pitch,
                         size_t              host_row_pitch,
-                        size_t              host_slice_pitch,                        
+                        size_t              host_slice_pitch,
                         void *              ptr,
                         cl_uint             num_events_in_wait_list,
                         const cl_event *    event_wait_list,
@@ -1227,16 +1229,16 @@ clEnqueueReadBufferRect(cl_command_queue    command_queue,
         return CL_INVALID_PLATFORM;
     }
 }
-                            
+
 cl_int
-clEnqueueWriteBuffer(cl_command_queue   command_queue, 
-                     cl_mem             buffer, 
-                     cl_bool            blocking_write, 
-                     size_t             offset, 
-                     size_t             size, 
-                     const void *       ptr, 
-                     cl_uint            num_events_in_wait_list, 
-                     const cl_event *   event_wait_list, 
+clEnqueueWriteBuffer(cl_command_queue   command_queue,
+                     cl_mem             buffer,
+                     cl_bool            blocking_write,
+                     size_t             offset,
+                     size_t             size,
+                     const void *       ptr,
+                     cl_uint            num_events_in_wait_list,
+                     const cl_event *   event_wait_list,
                      cl_event *         event)
 {
     f_clEnqueueWriteBuffer func;
@@ -1252,19 +1254,19 @@ clEnqueueWriteBuffer(cl_command_queue   command_queue,
         return CL_INVALID_PLATFORM;
     }
 }
-                            
+
 
 cl_int
 clEnqueueWriteBufferRect(cl_command_queue    command_queue,
                          cl_mem              buffer,
                          cl_bool             blocking_write,
                          const size_t *      buffer_offset,
-                         const size_t *      host_offset, 
+                         const size_t *      host_offset,
                          const size_t *      region,
                          size_t              buffer_row_pitch,
                          size_t              buffer_slice_pitch,
                          size_t              host_row_pitch,
-                         size_t              host_slice_pitch,                        
+                         size_t              host_slice_pitch,
                          const void *        ptr,
                          cl_uint             num_events_in_wait_list,
                          const cl_event *    event_wait_list,
@@ -1288,13 +1290,13 @@ clEnqueueWriteBufferRect(cl_command_queue    command_queue,
 
 cl_int
 clEnqueueFillBuffer(cl_command_queue   command_queue,
-                    cl_mem             buffer, 
-                    const void *       pattern, 
-                    size_t             pattern_size, 
-                    size_t             offset, 
-                    size_t             size, 
-                    cl_uint            num_events_in_wait_list, 
-                    const cl_event *   event_wait_list, 
+                    cl_mem             buffer,
+                    const void *       pattern,
+                    size_t             pattern_size,
+                    size_t             offset,
+                    size_t             size,
+                    cl_uint            num_events_in_wait_list,
+                    const cl_event *   event_wait_list,
                     cl_event *         event)
 {
     f_clEnqueueFillBuffer func;
@@ -1312,12 +1314,12 @@ clEnqueueFillBuffer(cl_command_queue   command_queue,
 }
 
 cl_int
-clEnqueueCopyBuffer(cl_command_queue    command_queue, 
+clEnqueueCopyBuffer(cl_command_queue    command_queue,
                     cl_mem              src_buffer,
-                    cl_mem              dst_buffer, 
+                    cl_mem              dst_buffer,
                     size_t              src_offset,
                     size_t              dst_offset,
-                    size_t              size, 
+                    size_t              size,
                     cl_uint             num_events_in_wait_list,
                     const cl_event *    event_wait_list,
                     cl_event *          event)
@@ -1335,16 +1337,16 @@ clEnqueueCopyBuffer(cl_command_queue    command_queue,
         return CL_INVALID_PLATFORM;
     }
 }
-                            
+
 
 
 cl_int
-clEnqueueCopyBufferRect(cl_command_queue    command_queue, 
+clEnqueueCopyBufferRect(cl_command_queue    command_queue,
                         cl_mem              src_buffer,
-                        cl_mem              dst_buffer, 
+                        cl_mem              dst_buffer,
                         const size_t *      src_origin,
                         const size_t *      dst_origin,
-                        const size_t *      region, 
+                        const size_t *      region,
                         size_t              src_row_pitch,
                         size_t              src_slice_pitch,
                         size_t              dst_row_pitch,
@@ -1370,11 +1372,11 @@ clEnqueueCopyBufferRect(cl_command_queue    command_queue,
 cl_int
 clEnqueueReadImage(cl_command_queue     command_queue,
                    cl_mem               image,
-                   cl_bool              blocking_read, 
+                   cl_bool              blocking_read,
                    const size_t *       origin,
                    const size_t *       region,
                    size_t               row_pitch,
-                   size_t               slice_pitch, 
+                   size_t               slice_pitch,
                    void *               ptr,
                    cl_uint              num_events_in_wait_list,
                    const cl_event *     event_wait_list,
@@ -1397,11 +1399,11 @@ clEnqueueReadImage(cl_command_queue     command_queue,
 cl_int
 clEnqueueWriteImage(cl_command_queue    command_queue,
                     cl_mem              image,
-                    cl_bool             blocking_write, 
+                    cl_bool             blocking_write,
                     const size_t *      origin,
                     const size_t *      region,
                     size_t              input_row_pitch,
-                    size_t              input_slice_pitch, 
+                    size_t              input_slice_pitch,
                     const void *        ptr,
                     cl_uint             num_events_in_wait_list,
                     const cl_event *    event_wait_list,
@@ -1424,12 +1426,12 @@ clEnqueueWriteImage(cl_command_queue    command_queue,
 
 cl_int
 clEnqueueFillImage(cl_command_queue   command_queue,
-                   cl_mem             image, 
-                   const void *       fill_color, 
-                   const size_t *     origin, 
-                   const size_t *     region, 
-                   cl_uint            num_events_in_wait_list, 
-                   const cl_event *   event_wait_list, 
+                   cl_mem             image,
+                   const void *       fill_color,
+                   const size_t *     origin,
+                   const size_t *     region,
+                   cl_uint            num_events_in_wait_list,
+                   const cl_event *   event_wait_list,
                    cl_event *         event)
 {
     f_clEnqueueFillImage func;
@@ -1448,10 +1450,10 @@ clEnqueueFillImage(cl_command_queue   command_queue,
 cl_int
 clEnqueueCopyImage(cl_command_queue     command_queue,
                    cl_mem               src_image,
-                   cl_mem               dst_image, 
+                   cl_mem               dst_image,
                    const size_t *       src_origin,
                    const size_t *       dst_origin,
-                   const size_t *       region, 
+                   const size_t *       region,
                    cl_uint              num_events_in_wait_list,
                    const cl_event *     event_wait_list,
                    cl_event *           event)
@@ -1473,9 +1475,9 @@ clEnqueueCopyImage(cl_command_queue     command_queue,
 cl_int
 clEnqueueCopyImageToBuffer(cl_command_queue command_queue,
                            cl_mem           src_image,
-                           cl_mem           dst_buffer, 
+                           cl_mem           dst_buffer,
                            const size_t *   src_origin,
-                           const size_t *   region, 
+                           const size_t *   region,
                            size_t           dst_offset,
                            cl_uint          num_events_in_wait_list,
                            const cl_event * event_wait_list,
@@ -1499,10 +1501,10 @@ clEnqueueCopyImageToBuffer(cl_command_queue command_queue,
 cl_int
 clEnqueueCopyBufferToImage(cl_command_queue command_queue,
                            cl_mem           src_buffer,
-                           cl_mem           dst_image, 
+                           cl_mem           dst_image,
                            size_t           src_offset,
                            const size_t *   dst_origin,
-                           const size_t *   region, 
+                           const size_t *   region,
                            cl_uint          num_events_in_wait_list,
                            const cl_event * event_wait_list,
                            cl_event *       event)
@@ -1524,7 +1526,7 @@ clEnqueueCopyBufferToImage(cl_command_queue command_queue,
 void *
 clEnqueueMapBuffer(cl_command_queue command_queue,
                    cl_mem           buffer,
-                   cl_bool          blocking_map, 
+                   cl_bool          blocking_map,
                    cl_map_flags     map_flags,
                    size_t           offset,
                    size_t           size,
@@ -1549,9 +1551,9 @@ clEnqueueMapBuffer(cl_command_queue command_queue,
 
 void *
 clEnqueueMapImage(cl_command_queue  command_queue,
-                  cl_mem            image, 
-                  cl_bool           blocking_map, 
-                  cl_map_flags      map_flags, 
+                  cl_mem            image,
+                  cl_bool           blocking_map,
+                  cl_map_flags      map_flags,
                   const size_t *    origin,
                   const size_t *    region,
                   size_t *          image_row_pitch,
@@ -1665,9 +1667,9 @@ clEnqueueTask(cl_command_queue  command_queue,
 
 cl_int
 clEnqueueNativeKernel(cl_command_queue  command_queue,
-                      void (*user_func)(void *), 
+                      void (*user_func)(void *),
                       void *            args,
-                      size_t            cb_args, 
+                      size_t            cb_args,
                       cl_uint           num_mem_objects,
                       const cl_mem *    mem_list,
                       const void **     args_mem_loc,
@@ -1727,7 +1729,7 @@ clEnqueueBarrierWithWaitList(cl_command_queue command_queue,
     }
 }
 
-void * 
+void *
 clGetExtensionFunctionAddressForPlatform(cl_platform_id platform,
                                          const char *   func_name)
 {
@@ -1743,7 +1745,7 @@ clGetExtensionFunctionAddressForPlatform(cl_platform_id platform,
         return NULL;
     }
 }
-    
+
 
 cl_mem
 clCreateImage2D(cl_context              context,
@@ -1751,7 +1753,7 @@ clCreateImage2D(cl_context              context,
                 const cl_image_format * image_format,
                 size_t                  image_width,
                 size_t                  image_height,
-                size_t                  image_row_pitch, 
+                size_t                  image_row_pitch,
                 void *                  host_ptr,
                 cl_int *                errcode_ret)
 {
@@ -1768,16 +1770,16 @@ clCreateImage2D(cl_context              context,
         return NULL;
     }
 }
- 
+
 cl_mem
 clCreateImage3D(cl_context              context,
                 cl_mem_flags            flags,
                 const cl_image_format * image_format,
-                size_t                  image_width, 
+                size_t                  image_width,
                 size_t                  image_height,
-                size_t                  image_depth, 
-                size_t                  image_row_pitch, 
-                size_t                  image_slice_pitch, 
+                size_t                  image_depth,
+                size_t                  image_row_pitch,
+                size_t                  image_slice_pitch,
                 void *                  host_ptr,
                 cl_int *                errcode_ret)
 {
@@ -1809,9 +1811,9 @@ clEnqueueMarker(cl_command_queue    command_queue,
         return func(command_queue, event);
     } else {
         return CL_INVALID_PLATFORM;
-    }   
+    }
 }
- 
+
 cl_int
 clEnqueueWaitForEvents(cl_command_queue command_queue,
                         cl_uint          num_events,
@@ -1829,7 +1831,7 @@ clEnqueueWaitForEvents(cl_command_queue command_queue,
         return CL_INVALID_PLATFORM;
     }
 }
- 
+
 cl_int
 clEnqueueBarrier(cl_command_queue command_queue)
 {
@@ -1861,7 +1863,7 @@ clUnloadCompiler(void)
         return CL_INVALID_PLATFORM;
     }
 }
- 
+
 void *
 clGetExtensionFunctionAddress(const char * func_name)
 {
@@ -1875,5 +1877,208 @@ clGetExtensionFunctionAddress(const char * func_name)
         return func(func_name);
     } else {
         return NULL;
+    }
+}
+
+
+cl_mem
+clCreateFromGLBuffer(cl_context     context,
+                     cl_mem_flags   flags,
+                     cl_GLuint      bufobj,
+                     int *          errcode_ret)
+{
+    f_clCreateFromGLBuffer func;
+
+    if(!so_handle)
+        open_libopencl_so();
+
+    func = (f_clCreateFromGLBuffer) dlsym(so_handle, "clCreateFromGLBuffer");
+    if(func) {
+        return func(context, flags, bufobj, errcode_ret);
+    } else {
+        return NULL;
+    }
+}
+
+cl_mem
+clCreateFromGLTexture(cl_context      context,
+                      cl_mem_flags    flags,
+                      cl_GLenum       target,
+                      cl_GLint        miplevel,
+                      cl_GLuint       texture,
+                      cl_int *        errcode_ret)
+{
+    f_clCreateFromGLTexture func;
+
+    if(!so_handle)
+        open_libopencl_so();
+
+    func = (f_clCreateFromGLTexture) dlsym(so_handle, "clCreateFromGLTexture");
+    if(func) {
+        return func(context, flags, target, miplevel, texture, errcode_ret);
+    } else {
+        return NULL;
+    }
+}
+
+cl_mem
+clCreateFromGLRenderbuffer(cl_context   context,
+                           cl_mem_flags flags,
+                           cl_GLuint    renderbuffer,
+                           cl_int *     errcode_ret)
+{
+    f_clCreateFromGLRenderbuffer func;
+
+    if(!so_handle)
+        open_libopencl_so();
+
+    func = (f_clCreateFromGLRenderbuffer) dlsym(so_handle, "clCreateFromGLRenderbuffer");
+    if(func) {
+        return func(context, flags, renderbuffer, errcode_ret);
+    } else {
+        return NULL;
+    }
+}
+
+cl_int
+clGetGLObjectInfo(cl_mem                memobj,
+                  cl_gl_object_type *   gl_object_type,
+                  cl_GLuint *           gl_object_name)
+{
+    f_clGetGLObjectInfo func;
+
+    if(!so_handle)
+        open_libopencl_so();
+
+    func = (f_clGetGLObjectInfo) dlsym(so_handle, "clGetGLObjectInfo");
+    if(func) {
+        return func(memobj, gl_object_type, gl_object_name);
+    } else {
+        return CL_INVALID_PLATFORM;
+    }
+}
+
+cl_int
+clGetGLTextureInfo(cl_mem               memobj,
+                   cl_gl_texture_info   param_name,
+                   size_t               param_value_size,
+                   void *               param_value,
+                   size_t *             param_value_size_ret)
+{
+    f_clGetGLTextureInfo func;
+
+    if(!so_handle)
+        open_libopencl_so();
+
+    func = (f_clGetGLTextureInfo) dlsym(so_handle, "clGetGLTextureInfo");
+    if(func) {
+        return func(memobj, param_name, param_value_size, param_value, param_value_size_ret);
+    } else {
+        return CL_INVALID_PLATFORM;
+    }
+}
+
+cl_int
+clEnqueueAcquireGLObjects(cl_command_queue      command_queue,
+                          cl_uint               num_objects,
+                          const cl_mem *        mem_objects,
+                          cl_uint               num_events_in_wait_list,
+                          const cl_event *      event_wait_list,
+                          cl_event *            event)
+{
+    f_clEnqueueAcquireGLObjects func;
+
+    if(!so_handle)
+        open_libopencl_so();
+
+    func = (f_clEnqueueAcquireGLObjects) dlsym(so_handle, "clEnqueueAcquireGLObjects");
+    if(func) {
+        return func(command_queue, num_objects, mem_objects, num_events_in_wait_list, event_wait_list, event);
+    } else {
+        return CL_INVALID_PLATFORM;
+    }
+}
+
+cl_int
+clEnqueueReleaseGLObjects(cl_command_queue      command_queue,
+                          cl_uint               num_objects,
+                          const cl_mem *        mem_objects,
+                          cl_uint               num_events_in_wait_list,
+                          const cl_event *      event_wait_list,
+                          cl_event *            event)
+{
+    f_clEnqueueReleaseGLObjects func;
+
+    if(!so_handle)
+        open_libopencl_so();
+
+    func = (f_clEnqueueReleaseGLObjects) dlsym(so_handle, "clEnqueueReleaseGLObjects");
+    if(func) {
+        return func(command_queue, num_objects, mem_objects, num_events_in_wait_list, event_wait_list, event);
+    } else {
+        return CL_INVALID_PLATFORM;
+    }
+}
+
+
+cl_mem
+clCreateFromGLTexture2D(cl_context      context,
+                        cl_mem_flags    flags,
+                        cl_GLenum       target,
+                        cl_GLint        miplevel,
+                        cl_GLuint       texture,
+                        cl_int *        errcode_ret)
+{
+    f_clCreateFromGLTexture2D func;
+
+    if(!so_handle)
+        open_libopencl_so();
+
+    func = (f_clCreateFromGLTexture2D) dlsym(so_handle, "clCreateFromGLTexture2D");
+    if(func) {
+        return func(context, flags, target, miplevel, texture, errcode_ret);
+    } else {
+        return NULL;
+    }
+}
+
+cl_mem
+clCreateFromGLTexture3D(cl_context      context,
+                        cl_mem_flags    flags,
+                        cl_GLenum       target,
+                        cl_GLint        miplevel,
+                        cl_GLuint       texture,
+                        cl_int *        errcode_ret)
+{
+    f_clCreateFromGLTexture3D func;
+
+    if(!so_handle)
+        open_libopencl_so();
+
+    func = (f_clCreateFromGLTexture3D) dlsym(so_handle, "clCreateFromGLTexture3D");
+    if(func) {
+        return func(context, flags, target, miplevel, texture, errcode_ret);
+    } else {
+        return NULL;
+    }
+}
+
+cl_int
+clGetGLContextInfoKHR(const cl_context_properties * properties,
+                      cl_gl_context_info            param_name,
+                      size_t                        param_value_size,
+                      void *                        param_value,
+                      size_t *                      param_value_size_ret)
+{
+    f_clGetGLContextInfoKHR func;
+
+    if(!so_handle)
+        open_libopencl_so();
+
+    func = (f_clGetGLContextInfoKHR) dlsym(so_handle, "clGetGLContextInfoKHR");
+    if(func) {
+        return func(properties, param_name, param_value_size, param_value, param_value_size_ret);
+    } else {
+        return CL_INVALID_PLATFORM;
     }
 }

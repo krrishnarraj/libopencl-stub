@@ -173,6 +173,9 @@
 #include <OpenGL/OpenGL.h>
 #include <OpenCL/opencl.h>
 #include <libkern/OSAtomic.h>
+#elif defined(__ANDROID__)
+#include <GLES/gl.h>
+#include <CL/opencl.h>
 #else
 #include <GL/gl.h>
 #include <CL/opencl.h>
@@ -211,7 +214,7 @@
 #include <string>
 #endif 
 
-#if defined(linux) || defined(__APPLE__) || defined(__MACOSX)
+#if defined(linux) || defined(__APPLE__) || defined(__MACOSX) || defined(__ANDROID__)
 #include <alloca.h>
 
 #endif // linux
