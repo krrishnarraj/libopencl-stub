@@ -19,7 +19,8 @@ static const char *default_so_paths[] = { // Android
                                           // Linux
                                             "/usr/lib/libOpenCL.so", "/usr/local/lib/libOpenCL.so",
                                             "/usr/local/lib/libpocl.so",
-                                            "/usr/lib64/libOpenCL.so", "/usr/lib32/libOpenCL.so"
+                                            "/usr/lib64/libOpenCL.so", "/usr/lib32/libOpenCL.so",
+                                            "libOpenCL.so"
                                           };
 
 static void *so_handle = NULL;
@@ -66,6 +67,13 @@ static void open_libopencl_so()
     }
 }
 
+void stubOpenclReset()
+{
+    if(so_handle)
+        dlclose(so_handle);
+
+    so_handle = NULL;
+}
 
 cl_int
 clGetPlatformIDs(cl_uint          num_entries,
