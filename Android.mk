@@ -7,7 +7,7 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := libOpenCL
-LOCAL_C_INCLUDES := include/
+LOCAL_C_INCLUDES := $(LOCAL_PATH)/include/
 LOCAL_SRC_FILES :=  libopencl.c
 LOCAL_CFLAGS   = -fPIC -O2
 
