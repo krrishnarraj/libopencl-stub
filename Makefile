@@ -1,10 +1,10 @@
 CC = gcc
 RANLIB = ranlib
 
-LIBSRC = libopencl.c
+LIBSRC = src/libopencl.c
 LIBOBJ=$(LIBSRC:.c=.o)
 
-CFLAGS = -O2 -fPIC -I ./include
+CFLAGS = -O2 -fPIC -I ./include -Wall
 
 LIBOPENCL = libOpenCL.a
 TARGETS = $(LIBOPENCL)
@@ -15,7 +15,7 @@ libopencl.o: libopencl.c
 	$(CC) $(CFLAGS) -c libopencl.c -o libopencl.o
 
 $(TARGETS): $(LIBOBJ)
-	ar rcs $(LIBOPENCL) libopencl.o
+	ar rcs $(LIBOPENCL) src/libopencl.o
 	$(RANLIB) $(LIBOPENCL)
 
 clean:
