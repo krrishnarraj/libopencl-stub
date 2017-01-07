@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 3.6)
 enable_language (C)
 project (libOpenCL-stub)
 
-set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -fPIC -I ./include -Wall")
+set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -fPIC -Wall")
 set (LIBRARY_NAME OpenCL)
 
 set(LIBSRC src/libopencl.c)
