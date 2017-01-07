@@ -3,7 +3,6 @@
 
 #include <stdlib.h>
 #include <sys/stat.h>
-#include <dlfcn.h>
 #include <CL/cl.h>
 #include <CL/cl_gl.h>
 
