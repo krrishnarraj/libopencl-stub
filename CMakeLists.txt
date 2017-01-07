@@ -7,6 +7,7 @@ set (CL_LIBRARY_NAME OpenCL)
 
 set(LIBSRC src/libopencl.c)
 
+SET(ARCHIVE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib) 
 include_directories (./include)
 add_library (${CL_LIBRARY_NAME} STATIC ${LIBSRC})
 if (WIN32)
@@ -24,6 +25,7 @@ install(TARGETS ${CL_LIBRARY_NAME}
 	LIBRARY DESTINATION lib
 	ARCHIVE DESTINATION lib
 	RUNTIME DESTINATION bin)
+
 
 file(GLOB HEADERS ./include/*.h ./include/CL/*.h)
 install(FILES ${HEADERS} DESTINATION include)
