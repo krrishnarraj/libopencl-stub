@@ -10,7 +10,11 @@
 **/
 
 #include "libopencl.h"
-
+#if defined(_WIN32)
+#include "Windows.h"
+#else
+#include <dlfcn.h>
+#endif
 
 #if defined(__APPLE__) || defined(__MACOSX)
 static const char *default_so_paths[] = {
@@ -40,7 +44,14 @@ static const char *default_so_paths[] = {
 };
 #endif
 
+#if defined(_WIN32)
+#define dlopen(filename, flags) LoadLibrary(filename)
+#define dlsym(hmod, func) GetProcAddress(hmod, func)
+#define dlclose(module) FreeLibrary(module)
+HMODULE so_handle = NULL;
+#else
 static void *so_handle = NULL;
+#endif
 
 
 static int access_file(const char *filename)
