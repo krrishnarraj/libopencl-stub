@@ -1,9 +1,7 @@
 #ifndef LIBOPENCL_STUB_H
 #define LIBOPENCL_STUB_H
 
-#include <stdlib.h>
-#include <sys/stat.h>
-#include <dlfcn.h>
+#define CL_TARGET_OPENCL_VERSION 120
 #include <CL/cl.h>
 #include <CL/cl_gl.h>
 

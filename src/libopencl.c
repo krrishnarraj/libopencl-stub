@@ -9,6 +9,9 @@
  *   If none of these are set, default system paths will be considered
 **/
 
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <dlfcn.h>
 #include "libopencl.h"
 
 
