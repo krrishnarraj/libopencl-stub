@@ -77,7 +77,7 @@ static int open_libopencl_so()
   {
     for(i=0; i<(sizeof(default_so_paths) / sizeof(char*)); i++)
     {
-      if(access_file(default_so_paths[i]))
+      if(default_so_paths[i][0] != '/' || access_file(default_so_paths[i]))
       {
         path = (char *) default_so_paths[i];
         break;
