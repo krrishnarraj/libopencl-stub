@@ -25,6 +25,8 @@ static const char *default_so_paths[] = {
   "/system/lib/libOpenCL.so",
   "/system/vendor/lib/libOpenCL.so",
   "/system/vendor/lib/egl/libGLES_mali.so",
+  "/system/vendor/lib64/egl/libGLES_mali.so",
+  "/system/vendor/lib64/egl/libGLES_1_mali.so",
   "/system/vendor/lib/libPVROCL.so",
   "/data/data/org.pocl.libs/files/lib/libpocl.so",
   "libOpenCL.so"
