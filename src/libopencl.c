@@ -10,7 +10,6 @@
 **/
 
 #include <stdlib.h>
-#include <sys/stat.h>
 #include <dlfcn.h>
 #include "libopencl.h"
 
@@ -49,45 +48,37 @@ static const char *default_so_paths[] = {
 static void *so_handle = NULL;
 
 
-static int access_file(const char *filename)
-{
-  struct stat buffer;
-  return (stat(filename, &buffer) == 0);
-}
-
 static int open_libopencl_so()
 {
-  char *path = NULL, *str = NULL;
+  char *str = NULL;
   int i;
 
-  if((str=getenv("LIBOPENCL_SO_PATH")) && access_file(str)) {
-    path = str;
+  if((str=getenv("LIBOPENCL_SO_PATH")) && (so_handle=dlopen(str, RTLD_LAZY))) {
+
   }
-  else if((str=getenv("LIBOPENCL_SO_PATH_2")) && access_file(str)) {
-    path = str;
+  else if((str=getenv("LIBOPENCL_SO_PATH_2")) && (so_handle=dlopen(str, RTLD_LAZY))) {
+
   }
-  else if((str=getenv("LIBOPENCL_SO_PATH_3")) && access_file(str)) {
-    path = str;
+  else if((str=getenv("LIBOPENCL_SO_PATH_3")) && (so_handle=dlopen(str, RTLD_LAZY))) {
+
   }
-  else if((str=getenv("LIBOPENCL_SO_PATH_4")) && access_file(str)) {
-    path = str;
+  else if((str=getenv("LIBOPENCL_SO_PATH_4")) && (so_handle=dlopen(str, RTLD_LAZY))) {
+
   }
 
-  if(!path)
+  if(!so_handle)
   {
     for(i=0; i<(sizeof(default_so_paths) / sizeof(char*)); i++)
     {
-      if(default_so_paths[i][0] != '/' || access_file(default_so_paths[i]))
+      if((so_handle=dlopen(default_so_paths[i], RTLD_LAZY)))
       {
-        path = (char *) default_so_paths[i];
         break;
       }
     }
   }
 
-  if(path)
+  if(so_handle)
   {
-    so_handle = dlopen(path, RTLD_LAZY);
     return 0;
   }
   else
