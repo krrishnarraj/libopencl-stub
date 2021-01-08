@@ -22,6 +22,11 @@ static const char *default_so_paths[] = {
 };
 #elif defined(__ANDROID__)
 static const char *default_so_paths[] = {
+  "/system/lib64/libOpenCL.so",
+  "/system/vendor/lib64/libOpenCL.so",
+  "/system/vendor/lib64/egl/libGLES_mali.so",
+  "/system/vendor/lib64/libPVROCL.so",
+  "/data/data/org.pocl.libs/files/lib64/libpocl.so",
   "/system/lib/libOpenCL.so",
   "/system/vendor/lib/libOpenCL.so",
   "/system/vendor/lib/egl/libGLES_mali.so",
@@ -348,6 +353,27 @@ clCreateCommandQueue(cl_context                     context,
     return NULL;
   }
 }
+
+#ifdef CL_VERSION_2_0
+cl_command_queue
+clCreateCommandQueueWithProperties(cl_context                     context,
+                                   cl_device_id                   device,
+                     	             const cl_queue_properties *    properties,
+                                   cl_int *                       errcode_ret)
+{
+  f_clCreateCommandQueueWithProperties func;
+
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clCreateCommandQueueWithProperties) dlsym(so_handle, "clCreateCommandQueueWithProperties");
+  if(func) {
+    return func(context, device, properties, errcode_ret);
+  } else {
+    return NULL;
+  }
+}
+#endif
 
 cl_int
 clRetainCommandQueue(cl_command_queue command_queue)

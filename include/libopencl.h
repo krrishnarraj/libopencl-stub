@@ -37,6 +37,10 @@ typedef cl_int (*f_clGetContextInfo) (cl_context, cl_context_info, size_t, void 
 
 typedef cl_command_queue (*f_clCreateCommandQueue) (cl_context, cl_device_id, cl_command_queue_properties, cl_int *);
 
+#ifdef CL_VERSION_2_0
+typedef cl_command_queue (*f_clCreateCommandQueueWithProperties) (cl_context, cl_device_id, const cl_queue_properties *, cl_int *);
+#endif
+
 typedef cl_int (*f_clRetainCommandQueue) (cl_command_queue);
 
 typedef cl_int (*f_clReleaseCommandQueue) (cl_command_queue);
