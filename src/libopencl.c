@@ -8,12 +8,70 @@
  *
  *   If none of these are set, default system paths will be considered
 **/
-
 #include <stdlib.h>
 #include <sys/stat.h>
-#include <dlfcn.h>
 #include "libopencl.h"
+#if defined(__APPLE__) || defined(__MACOSX) || defined(__ANDROID__) || defined(__linux__) || defined(_POSIX_C_SOURCE)
+#include <dlfcn.h>
+#elif defined(_WIN32) || efined(WINVER)
+#include <inttypes.h>
+#include <stdio.h>
+#include <string.h>
+#include <windows.h>
 
+static struct {
+    long lasterror;
+    const char *err_rutin;
+} var = {
+    0,
+    NULL
+};
+
+void *dlopen (const char *filename, int flags){
+    HINSTANCE hInst;
+
+    hInst= LoadLibrary (filename);
+    if (hInst==NULL) {
+        var.lasterror = GetLastError ();
+        var.err_rutin = "dlopen";
+    }
+    return hInst;
+}
+
+int dlclose (void *handle){
+    BOOL ok;
+    int rc= 0;
+
+    ok= FreeLibrary ((HINSTANCE)handle);
+    if (! ok) {
+        var.lasterror = GetLastError ();
+        var.err_rutin = "dlclose";
+        rc= -1;
+    }
+    return rc;
+}
+
+void *dlsym (void *handle, const char *name){
+    FARPROC fp;
+
+    fp= GetProcAddress ((HINSTANCE)handle, name);
+    if (!fp) {
+        var.lasterror = GetLastError ();
+        var.err_rutin = "dlsym";
+    }
+    return (void *)(intptr_t)fp;
+}
+const char *dlerror (void){
+static char errstr [88];
+
+    if (var.lasterror) {
+        sprintf (errstr, "%s error #%ld", var.err_rutin, var.lasterror);
+        return errstr;
+    } else {
+        return NULL;
+    }
+}
+#endif
 
 #if defined(__APPLE__) || defined(__MACOSX)
 static const char *default_so_paths[] = {
@@ -34,7 +92,7 @@ static const char *default_so_paths[] = {
   "/data/data/org.pocl.libs/files/lib/libpocl.so",
   "libOpenCL.so"
 };
-#elif defined(_WIN32)
+#elif defined(_WIN32) || defined(WINVER)
 static const char *default_so_paths[] = {
   "OpenCL.dll"
 };
