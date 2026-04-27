@@ -13,23 +13,11 @@
 #include "libopencl.h"
 #if defined(__APPLE__) || defined(__MACOSX) || defined(__ANDROID__) || defined(__linux__) || defined(_POSIX_C_SOURCE)
 #include <dlfcn.h>
-#include <pthread.h>
-static pthread_mutex_t g_init_mutex = PTHREAD_MUTEX_INITIALIZER;
-static void stub_lock(void)   { pthread_mutex_lock(&g_init_mutex); }
-static void stub_unlock(void) { pthread_mutex_unlock(&g_init_mutex); }
-#elif defined(_WIN32) || defined(WINVER)
+#elif defined(_WIN32) || efined(WINVER)
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
 #include <windows.h>
-
-#ifndef RTLD_LAZY
-#define RTLD_LAZY 0
-#endif
-
-static volatile LONG g_init_lock = 0;
-static void stub_lock(void)   { while (InterlockedCompareExchange(&g_init_lock, 1, 0) != 0) Sleep(0); }
-static void stub_unlock(void) { InterlockedExchange(&g_init_lock, 0); }
 
 static struct {
     long lasterror;
@@ -41,7 +29,6 @@ static struct {
 
 void *dlopen (const char *filename, int flags){
     HINSTANCE hInst;
-    (void)flags;
 
     hInst= LoadLibrary (filename);
     if (hInst==NULL) {
@@ -67,7 +54,6 @@ int dlclose (void *handle){
 void *dlsym (void *handle, const char *name){
     FARPROC fp;
 
-    if (!handle) return NULL;
     fp= GetProcAddress ((HINSTANCE)handle, name);
     if (!fp) {
         var.lasterror = GetLastError ();
@@ -79,7 +65,7 @@ const char *dlerror (void){
 static char errstr [88];
 
     if (var.lasterror) {
-        snprintf (errstr, sizeof(errstr), "%s error #%ld", var.err_rutin, var.lasterror);
+        sprintf (errstr, "%s error #%ld", var.err_rutin, var.lasterror);
         return errstr;
     } else {
         return NULL;
@@ -132,48 +118,51 @@ static int access_file(const char *filename)
 
 static int open_libopencl_so()
 {
-  const char *env_vars[] = {
-    "LIBOPENCL_SO_PATH", "LIBOPENCL_SO_PATH_2",
-    "LIBOPENCL_SO_PATH_3", "LIBOPENCL_SO_PATH_4"
-  };
-  char *str = NULL;
-  size_t i;
+  char *path = NULL, *str = NULL;
+  int i;
 
-  for (i = 0; i < sizeof(env_vars) / sizeof(char*); i++) {
-    if ((str = getenv(env_vars[i])) && access_file(str)) {
-      so_handle = dlopen(str, RTLD_LAZY);
-      if (so_handle) return 0;
+  if((str=getenv("LIBOPENCL_SO_PATH")) && access_file(str)) {
+    path = str;
+  }
+  else if((str=getenv("LIBOPENCL_SO_PATH_2")) && access_file(str)) {
+    path = str;
+  }
+  else if((str=getenv("LIBOPENCL_SO_PATH_3")) && access_file(str)) {
+    path = str;
+  }
+  else if((str=getenv("LIBOPENCL_SO_PATH_4")) && access_file(str)) {
+    path = str;
+  }
+
+  if(!path)
+  {
+    for(i=0; i<(sizeof(default_so_paths) / sizeof(char*)); i++)
+    {
+      if(access_file(default_so_paths[i]))
+      {
+        path = (char *) default_so_paths[i];
+        break;
+      }
     }
   }
 
-  for (i = 0; i < sizeof(default_so_paths) / sizeof(char*); i++) {
-    so_handle = dlopen(default_so_paths[i], RTLD_LAZY);
-    if (so_handle) return 0;
+  if(path)
+  {
+    so_handle = dlopen(path, RTLD_LAZY);
+    return 0;
   }
-
-  return -1;
-}
-
-#define SET_ERR_RET_NULL() do { if (errcode_ret) *errcode_ret = CL_INVALID_PLATFORM; return NULL; } while(0)
-
-static void *stub_dlsym(const char *name)
-{
-  if (!so_handle) {
-    stub_lock();
-    if (!so_handle) open_libopencl_so();
-    stub_unlock();
+  else
+  {
+    return -1;
   }
-  if (!so_handle) return NULL;
-  return stub_dlsym(name);
 }
 
 void stubOpenclReset()
 {
-  stub_lock();
   if(so_handle)
     dlclose(so_handle);
+
   so_handle = NULL;
-  stub_unlock();
 }
 
 cl_int
@@ -183,7 +172,10 @@ clGetPlatformIDs(cl_uint          num_entries,
 {
   f_clGetPlatformIDs func;
 
-  func = (f_clGetPlatformIDs) stub_dlsym("clGetPlatformIDs");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clGetPlatformIDs) dlsym(so_handle, "clGetPlatformIDs");
   if(func) {
     return func(num_entries, platforms, num_platforms);
   } else {
@@ -201,7 +193,10 @@ clGetPlatformInfo(cl_platform_id   platform,
 {
   f_clGetPlatformInfo func;
 
-  func = (f_clGetPlatformInfo) stub_dlsym("clGetPlatformInfo");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clGetPlatformInfo) dlsym(so_handle, "clGetPlatformInfo");
   if(func) {
     return func(platform, param_name, param_value_size, param_value, param_value_size_ret);
   } else {
@@ -219,7 +214,10 @@ clGetDeviceIDs(cl_platform_id   platform,
 {
   f_clGetDeviceIDs func;
 
-  func = (f_clGetDeviceIDs) stub_dlsym("clGetDeviceIDs");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clGetDeviceIDs) dlsym(so_handle, "clGetDeviceIDs");
   if(func) {
     return func(platform, device_type, num_entries, devices, num_devices);
   } else {
@@ -236,7 +234,10 @@ clGetDeviceInfo(cl_device_id    device,
 {
   f_clGetDeviceInfo func;
 
-  func = (f_clGetDeviceInfo) stub_dlsym("clGetDeviceInfo");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clGetDeviceInfo) dlsym(so_handle, "clGetDeviceInfo");
   if(func) {
     return func(device, param_name, param_value_size, param_value, param_value_size_ret);
   } else {
@@ -253,7 +254,10 @@ clCreateSubDevices(cl_device_id                         in_device,
 {
   f_clCreateSubDevices func;
 
-  func = (f_clCreateSubDevices) stub_dlsym("clCreateSubDevices");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clCreateSubDevices) dlsym(so_handle, "clCreateSubDevices");
   if(func) {
     return func(in_device, properties, num_devices, out_devices, num_devices_ret);
   } else {
@@ -266,7 +270,10 @@ clRetainDevice(cl_device_id device)
 {
   f_clRetainDevice func;
 
-  func = (f_clRetainDevice) stub_dlsym("clRetainDevice");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clRetainDevice) dlsym(so_handle, "clRetainDevice");
   if(func) {
     return func(device);
   } else {
@@ -279,7 +286,10 @@ clReleaseDevice(cl_device_id device)
 {
   f_clReleaseDevice func;
 
-  func = (f_clReleaseDevice) stub_dlsym("clReleaseDevice");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clReleaseDevice) dlsym(so_handle, "clReleaseDevice");
   if(func) {
     return func(device);
   } else {
@@ -298,11 +308,14 @@ clCreateContext(const cl_context_properties * properties,
 {
   f_clCreateContext func;
 
-  func = (f_clCreateContext) stub_dlsym("clCreateContext");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clCreateContext) dlsym(so_handle, "clCreateContext");
   if(func) {
     return func(properties, num_devices, devices, pfn_notify, user_data, errcode_ret);
   } else {
-    SET_ERR_RET_NULL();
+    return NULL;
   }
 }
 
@@ -315,11 +328,14 @@ clCreateContextFromType(const cl_context_properties * properties,
 {
   f_clCreateContextFromType func;
 
-  func = (f_clCreateContextFromType) stub_dlsym("clCreateContextFromType");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clCreateContextFromType) dlsym(so_handle, "clCreateContextFromType");
   if(func) {
     return func(properties, device_type, pfn_notify, user_data, errcode_ret);
   } else {
-    SET_ERR_RET_NULL();
+    return NULL;
   }
 }
 
@@ -328,7 +344,10 @@ clRetainContext(cl_context context)
 {
   f_clRetainContext func;
 
-  func = (f_clRetainContext) stub_dlsym("clRetainContext");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clRetainContext) dlsym(so_handle, "clRetainContext");
   if(func) {
     return func(context);
   } else {
@@ -341,7 +360,10 @@ clReleaseContext(cl_context context)
 {
   f_clReleaseContext func;
 
-  func = (f_clReleaseContext) stub_dlsym("clReleaseContext");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clReleaseContext) dlsym(so_handle, "clReleaseContext");
   if(func) {
     return func(context);
   } else {
@@ -358,7 +380,10 @@ clGetContextInfo(cl_context         context,
 {
   f_clGetContextInfo func;
 
-  func = (f_clGetContextInfo) stub_dlsym("clGetContextInfo");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clGetContextInfo) dlsym(so_handle, "clGetContextInfo");
   if(func) {
     return func(context, param_name, param_value_size,
                 param_value, param_value_size_ret);
@@ -376,11 +401,14 @@ clCreateCommandQueue(cl_context                     context,
 {
   f_clCreateCommandQueue func;
 
-  func = (f_clCreateCommandQueue) stub_dlsym("clCreateCommandQueue");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clCreateCommandQueue) dlsym(so_handle, "clCreateCommandQueue");
   if(func) {
     return func(context, device, properties, errcode_ret);
   } else {
-    SET_ERR_RET_NULL();
+    return NULL;
   }
 }
 
@@ -393,11 +421,14 @@ clCreateCommandQueueWithProperties(cl_context                     context,
 {
   f_clCreateCommandQueueWithProperties func;
 
-  func = (f_clCreateCommandQueueWithProperties) stub_dlsym("clCreateCommandQueueWithProperties");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clCreateCommandQueueWithProperties) dlsym(so_handle, "clCreateCommandQueueWithProperties");
   if(func) {
     return func(context, device, properties, errcode_ret);
   } else {
-    SET_ERR_RET_NULL();
+    return NULL;
   }
 }
 #endif
@@ -407,7 +438,10 @@ clRetainCommandQueue(cl_command_queue command_queue)
 {
   f_clRetainCommandQueue func;
 
-  func = (f_clRetainCommandQueue) stub_dlsym("clRetainCommandQueue");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clRetainCommandQueue) dlsym(so_handle, "clRetainCommandQueue");
   if(func) {
     return func(command_queue);
   } else {
@@ -420,7 +454,10 @@ clReleaseCommandQueue(cl_command_queue command_queue)
 {
   f_clReleaseCommandQueue func;
 
-  func = (f_clReleaseCommandQueue) stub_dlsym("clReleaseCommandQueue");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clReleaseCommandQueue) dlsym(so_handle, "clReleaseCommandQueue");
   if(func) {
     return func(command_queue);
   } else {
@@ -437,7 +474,10 @@ clGetCommandQueueInfo(cl_command_queue      command_queue,
 {
   f_clGetCommandQueueInfo func;
 
-  func = (f_clGetCommandQueueInfo) stub_dlsym("clGetCommandQueueInfo");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clGetCommandQueueInfo) dlsym(so_handle, "clGetCommandQueueInfo");
   if(func) {
     return func(command_queue, param_name, param_value_size,
                 param_value, param_value_size_ret);
@@ -456,11 +496,14 @@ clCreateBuffer(cl_context   context,
 {
   f_clCreateBuffer func;
 
-  func = (f_clCreateBuffer) stub_dlsym("clCreateBuffer");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clCreateBuffer) dlsym(so_handle, "clCreateBuffer");
   if(func) {
     return func(context, flags, size, host_ptr, errcode_ret);
   } else {
-    SET_ERR_RET_NULL();
+    return NULL;
   }
 }
 
@@ -473,12 +516,15 @@ clCreateSubBuffer(cl_mem                   buffer,
 {
   f_clCreateSubBuffer func;
 
-  func = (f_clCreateSubBuffer) stub_dlsym("clCreateSubBuffer");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clCreateSubBuffer) dlsym(so_handle, "clCreateSubBuffer");
   if(func) {
     return func(buffer, flags, buffer_create_type,
                 buffer_create_info, errcode_ret);
   } else {
-    SET_ERR_RET_NULL();
+    return NULL;
   }
 }
 
@@ -492,12 +538,15 @@ clCreateImage(cl_context              context,
 {
   f_clCreateImage func;
 
-  func = (f_clCreateImage) stub_dlsym("clCreateImage");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clCreateImage) dlsym(so_handle, "clCreateImage");
   if(func) {
     return func(context, flags, image_format, image_desc,
                 host_ptr, errcode_ret);
   } else {
-    SET_ERR_RET_NULL();
+    return NULL;
   }
 }
 
@@ -506,7 +555,10 @@ clRetainMemObject(cl_mem memobj)
 {
   f_clRetainMemObject func;
 
-  func = (f_clRetainMemObject) stub_dlsym("clRetainMemObject");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clRetainMemObject) dlsym(so_handle, "clRetainMemObject");
   if(func) {
     return func(memobj);
   } else {
@@ -519,7 +571,10 @@ clReleaseMemObject(cl_mem memobj)
 {
   f_clReleaseMemObject func;
 
-  func = (f_clReleaseMemObject) stub_dlsym("clReleaseMemObject");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clReleaseMemObject) dlsym(so_handle, "clReleaseMemObject");
   if(func) {
     return func(memobj);
   } else {
@@ -537,7 +592,10 @@ clGetSupportedImageFormats(cl_context           context,
 {
   f_clGetSupportedImageFormats func;
 
-  func = (f_clGetSupportedImageFormats) stub_dlsym("clGetSupportedImageFormats");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clGetSupportedImageFormats) dlsym(so_handle, "clGetSupportedImageFormats");
   if(func) {
     return func(context, flags, image_type, num_entries,
                 image_formats, num_image_formats);
@@ -555,7 +613,10 @@ clGetMemObjectInfo(cl_mem           memobj,
 {
   f_clGetMemObjectInfo func;
 
-  func = (f_clGetMemObjectInfo) stub_dlsym("clGetMemObjectInfo");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clGetMemObjectInfo) dlsym(so_handle, "clGetMemObjectInfo");
   if(func) {
     return func(memobj, param_name, param_value_size,
                 param_value, param_value_size_ret);
@@ -573,7 +634,10 @@ clGetImageInfo(cl_mem           image,
 {
   f_clGetImageInfo func;
 
-  func = (f_clGetImageInfo) stub_dlsym("clGetImageInfo");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clGetImageInfo) dlsym(so_handle, "clGetImageInfo");
   if(func) {
     return func(image, param_name, param_value_size,
                 param_value, param_value_size_ret);
@@ -589,7 +653,10 @@ clSetMemObjectDestructorCallback(  cl_mem memobj,
 {
   f_clSetMemObjectDestructorCallback func;
 
-  func = (f_clSetMemObjectDestructorCallback) stub_dlsym("clSetMemObjectDestructorCallback");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clSetMemObjectDestructorCallback) dlsym(so_handle, "clSetMemObjectDestructorCallback");
   if(func) {
     return func(memobj, pfn_notify, user_data);
   } else {
@@ -606,11 +673,14 @@ clCreateSampler(cl_context          context,
 {
   f_clCreateSampler func;
 
-  func = (f_clCreateSampler) stub_dlsym("clCreateSampler");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clCreateSampler) dlsym(so_handle, "clCreateSampler");
   if(func) {
     return func(context, normalized_coords, addressing_mode, filter_mode, errcode_ret);
   } else {
-    SET_ERR_RET_NULL();
+    return NULL;
   }
 }
 
@@ -619,7 +689,10 @@ clRetainSampler(cl_sampler sampler)
 {
   f_clRetainSampler func;
 
-  func = (f_clRetainSampler) stub_dlsym("clRetainSampler");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clRetainSampler) dlsym(so_handle, "clRetainSampler");
   if(func) {
     return func(sampler);
   } else {
@@ -632,7 +705,10 @@ clReleaseSampler(cl_sampler sampler)
 {
   f_clReleaseSampler func;
 
-  func = (f_clReleaseSampler) stub_dlsym("clReleaseSampler");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clReleaseSampler) dlsym(so_handle, "clReleaseSampler");
   if(func) {
     return func(sampler);
   } else {
@@ -649,7 +725,10 @@ clGetSamplerInfo(cl_sampler         sampler,
 {
   f_clGetSamplerInfo func;
 
-  func = (f_clGetSamplerInfo) stub_dlsym("clGetSamplerInfo");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clGetSamplerInfo) dlsym(so_handle, "clGetSamplerInfo");
   if(func) {
     return func(sampler, param_name, param_value_size, param_value, param_value_size_ret);
   } else {
@@ -667,11 +746,14 @@ clCreateProgramWithSource(cl_context        context,
 {
   f_clCreateProgramWithSource func;
 
-  func = (f_clCreateProgramWithSource) stub_dlsym("clCreateProgramWithSource");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clCreateProgramWithSource) dlsym(so_handle, "clCreateProgramWithSource");
   if(func) {
     return func(context, count, strings, lengths, errcode_ret);
   } else {
-    SET_ERR_RET_NULL();
+    return NULL;
   }
 }
 
@@ -688,11 +770,14 @@ clCreateProgramWithBinary(cl_context                     context,
 {
   f_clCreateProgramWithBinary func;
 
-  func = (f_clCreateProgramWithBinary) stub_dlsym("clCreateProgramWithBinary");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clCreateProgramWithBinary) dlsym(so_handle, "clCreateProgramWithBinary");
   if(func) {
     return func(context, num_devices, device_list, lengths, binaries, binary_status, errcode_ret);
   } else {
-    SET_ERR_RET_NULL();
+    return NULL;
   }
 }
 
@@ -705,11 +790,14 @@ clCreateProgramWithBuiltInKernels(cl_context            context,
 {
   f_clCreateProgramWithBuiltInKernels func;
 
-  func = (f_clCreateProgramWithBuiltInKernels) stub_dlsym("clCreateProgramWithBuiltInKernels");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clCreateProgramWithBuiltInKernels) dlsym(so_handle, "clCreateProgramWithBuiltInKernels");
   if(func) {
     return func(context, num_devices, device_list, kernel_names, errcode_ret);
   } else {
-    SET_ERR_RET_NULL();
+    return NULL;
   }
 }
 
@@ -718,7 +806,10 @@ clRetainProgram(cl_program program)
 {
   f_clRetainProgram func;
 
-  func = (f_clRetainProgram) stub_dlsym("clRetainProgram");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clRetainProgram) dlsym(so_handle, "clRetainProgram");
   if(func) {
     return func(program);
   } else {
@@ -731,7 +822,10 @@ clReleaseProgram(cl_program program)
 {
   f_clReleaseProgram func;
 
-  func = (f_clReleaseProgram) stub_dlsym("clReleaseProgram");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clReleaseProgram) dlsym(so_handle, "clReleaseProgram");
   if(func) {
     return func(program);
   } else {
@@ -749,7 +843,10 @@ clBuildProgram(cl_program           program,
 {
   f_clBuildProgram func;
 
-  func = (f_clBuildProgram) stub_dlsym("clBuildProgram");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clBuildProgram) dlsym(so_handle, "clBuildProgram");
   if(func) {
     return func(program, num_devices, device_list, options, pfn_notify, user_data);
   } else {
@@ -770,7 +867,10 @@ clCompileProgram(cl_program           program,
 {
   f_clCompileProgram func;
 
-  func = (f_clCompileProgram) stub_dlsym("clCompileProgram");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clCompileProgram) dlsym(so_handle, "clCompileProgram");
   if(func) {
     return func(program, num_devices, device_list, options, num_input_headers, input_headers,
                 header_include_names, pfn_notify, user_data);
@@ -792,12 +892,15 @@ clLinkProgram(cl_context           context,
 {
   f_clLinkProgram func;
 
-  func = (f_clLinkProgram) stub_dlsym("clLinkProgram");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clLinkProgram) dlsym(so_handle, "clLinkProgram");
   if(func) {
     return func(context, num_devices, device_list, options, num_input_programs,
                 input_programs, pfn_notify, user_data, errcode_ret);
   } else {
-    SET_ERR_RET_NULL();
+    return NULL;
   }
 }
 
@@ -807,7 +910,10 @@ clUnloadPlatformCompiler(cl_platform_id platform)
 {
   f_clUnloadPlatformCompiler func;
 
-  func = (f_clUnloadPlatformCompiler) stub_dlsym("clUnloadPlatformCompiler");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clUnloadPlatformCompiler) dlsym(so_handle, "clUnloadPlatformCompiler");
   if(func) {
     return func(platform);
   } else {
@@ -824,7 +930,10 @@ clGetProgramInfo(cl_program         program,
 {
   f_clGetProgramInfo func;
 
-  func = (f_clGetProgramInfo) stub_dlsym("clGetProgramInfo");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clGetProgramInfo) dlsym(so_handle, "clGetProgramInfo");
   if(func) {
     return func(program, param_name, param_value_size,
                 param_value, param_value_size_ret);
@@ -843,7 +952,10 @@ clGetProgramBuildInfo(cl_program            program,
 {
   f_clGetProgramBuildInfo func;
 
-  func = (f_clGetProgramBuildInfo) stub_dlsym("clGetProgramBuildInfo");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clGetProgramBuildInfo) dlsym(so_handle, "clGetProgramBuildInfo");
   if(func) {
     return func(program, device, param_name, param_value_size,
                 param_value, param_value_size_ret);
@@ -860,11 +972,14 @@ clCreateKernel(cl_program      program,
 {
   f_clCreateKernel func;
 
-  func = (f_clCreateKernel) stub_dlsym("clCreateKernel");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clCreateKernel) dlsym(so_handle, "clCreateKernel");
   if(func) {
     return func(program, kernel_name, errcode_ret);
   } else {
-    SET_ERR_RET_NULL();
+    return NULL;
   }
 }
 
@@ -876,7 +991,10 @@ clCreateKernelsInProgram(cl_program     program,
 {
   f_clCreateKernelsInProgram func;
 
-  func = (f_clCreateKernelsInProgram) stub_dlsym("clCreateKernelsInProgram");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clCreateKernelsInProgram) dlsym(so_handle, "clCreateKernelsInProgram");
   if(func) {
     return func(program, num_kernels, kernels, num_kernels_ret);
   } else {
@@ -889,7 +1007,10 @@ clRetainKernel(cl_kernel    kernel)
 {
   f_clRetainKernel func;
 
-  func = (f_clRetainKernel) stub_dlsym("clRetainKernel");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clRetainKernel) dlsym(so_handle, "clRetainKernel");
   if(func) {
     return func(kernel);
   } else {
@@ -902,7 +1023,10 @@ clReleaseKernel(cl_kernel   kernel)
 {
   f_clReleaseKernel func;
 
-  func = (f_clReleaseKernel) stub_dlsym("clReleaseKernel");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clReleaseKernel) dlsym(so_handle, "clReleaseKernel");
   if(func) {
     return func(kernel);
   } else {
@@ -918,7 +1042,10 @@ clSetKernelArg(cl_kernel    kernel,
 {
   f_clSetKernelArg func;
 
-  func = (f_clSetKernelArg) stub_dlsym("clSetKernelArg");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clSetKernelArg) dlsym(so_handle, "clSetKernelArg");
   if(func) {
     return func(kernel, arg_index, arg_size, arg_value);
   } else {
@@ -935,7 +1062,10 @@ clGetKernelInfo(cl_kernel       kernel,
 {
   f_clGetKernelInfo func;
 
-  func = (f_clGetKernelInfo) stub_dlsym("clGetKernelInfo");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clGetKernelInfo) dlsym(so_handle, "clGetKernelInfo");
   if(func) {
     return func(kernel, param_name, param_value_size, param_value, param_value_size_ret);
   } else {
@@ -953,7 +1083,10 @@ clGetKernelArgInfo(cl_kernel       kernel,
 {
   f_clGetKernelArgInfo func;
 
-  func = (f_clGetKernelArgInfo) stub_dlsym("clGetKernelArgInfo");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clGetKernelArgInfo) dlsym(so_handle, "clGetKernelArgInfo");
   if(func) {
     return func(kernel, arg_indx, param_name, param_value_size,
                 param_value, param_value_size_ret);
@@ -972,7 +1105,10 @@ clGetKernelWorkGroupInfo(cl_kernel                  kernel,
 {
   f_clGetKernelWorkGroupInfo func;
 
-  func = (f_clGetKernelWorkGroupInfo) stub_dlsym("clGetKernelWorkGroupInfo");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clGetKernelWorkGroupInfo) dlsym(so_handle, "clGetKernelWorkGroupInfo");
   if(func) {
     return func(kernel, device, param_name, param_value_size, param_value, param_value_size_ret);
   } else {
@@ -987,7 +1123,10 @@ clWaitForEvents(cl_uint             num_events,
 {
   f_clWaitForEvents func;
 
-  func = (f_clWaitForEvents) stub_dlsym("clWaitForEvents");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clWaitForEvents) dlsym(so_handle, "clWaitForEvents");
   if(func) {
     return func(num_events, event_list);
   } else {
@@ -1005,7 +1144,10 @@ clGetEventInfo(cl_event         event,
 {
   f_clGetEventInfo func;
 
-  func = (f_clGetEventInfo) stub_dlsym("clGetEventInfo");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clGetEventInfo) dlsym(so_handle, "clGetEventInfo");
   if(func) {
     return func(event, param_name, param_value_size, param_value, param_value_size_ret);
   } else {
@@ -1019,11 +1161,14 @@ clCreateUserEvent(cl_context    context,
 {
   f_clCreateUserEvent func;
 
-  func = (f_clCreateUserEvent) stub_dlsym("clCreateUserEvent");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clCreateUserEvent) dlsym(so_handle, "clCreateUserEvent");
   if(func) {
     return func(context, errcode_ret);
   } else {
-    SET_ERR_RET_NULL();
+    return NULL;
   }
 }
 
@@ -1032,7 +1177,10 @@ clRetainEvent(cl_event event)
 {
   f_clRetainEvent func;
 
-  func = (f_clRetainEvent) stub_dlsym("clRetainEvent");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clRetainEvent) dlsym(so_handle, "clRetainEvent");
   if(func) {
     return func(event);
   } else {
@@ -1045,7 +1193,10 @@ clReleaseEvent(cl_event event)
 {
   f_clReleaseEvent func;
 
-  func = (f_clReleaseEvent) stub_dlsym("clReleaseEvent");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clReleaseEvent) dlsym(so_handle, "clReleaseEvent");
   if(func) {
     return func(event);
   } else {
@@ -1059,7 +1210,10 @@ clSetUserEventStatus(cl_event   event,
 {
   f_clSetUserEventStatus func;
 
-  func = (f_clSetUserEventStatus) stub_dlsym("clSetUserEventStatus");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clSetUserEventStatus) dlsym(so_handle, "clSetUserEventStatus");
   if(func) {
     return func(event, execution_status);
   } else {
@@ -1075,7 +1229,10 @@ clSetEventCallback( cl_event    event,
 {
   f_clSetEventCallback func;
 
-  func = (f_clSetEventCallback) stub_dlsym("clSetEventCallback");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clSetEventCallback) dlsym(so_handle, "clSetEventCallback");
   if(func) {
     return func(event, command_exec_callback_type, pfn_notify, user_data);
   } else {
@@ -1092,7 +1249,10 @@ clGetEventProfilingInfo(cl_event            event,
 {
   f_clGetEventProfilingInfo func;
 
-  func = (f_clGetEventProfilingInfo) stub_dlsym("clGetEventProfilingInfo");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clGetEventProfilingInfo) dlsym(so_handle, "clGetEventProfilingInfo");
   if(func) {
     return func(event, param_name, param_value_size, param_value, param_value_size_ret);
   } else {
@@ -1105,7 +1265,10 @@ clFlush(cl_command_queue command_queue)
 {
   f_clFlush func;
 
-  func = (f_clFlush) stub_dlsym("clFlush");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clFlush) dlsym(so_handle, "clFlush");
   if(func) {
     return func(command_queue);
   } else {
@@ -1118,7 +1281,10 @@ clFinish(cl_command_queue command_queue)
 {
   f_clFinish func;
 
-  func = (f_clFinish) stub_dlsym("clFinish");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clFinish) dlsym(so_handle, "clFinish");
   if(func) {
     return func(command_queue);
   } else {
@@ -1140,7 +1306,10 @@ clEnqueueReadBuffer(cl_command_queue    command_queue,
 {
   f_clEnqueueReadBuffer func;
 
-  func = (f_clEnqueueReadBuffer) stub_dlsym("clEnqueueReadBuffer");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueReadBuffer) dlsym(so_handle, "clEnqueueReadBuffer");
   if(func) {
     return func(command_queue, buffer, blocking_read, offset, size, ptr,
                 num_events_in_wait_list, event_wait_list, event);
@@ -1167,7 +1336,10 @@ clEnqueueReadBufferRect(cl_command_queue    command_queue,
 {
   f_clEnqueueReadBufferRect func;
 
-  func = (f_clEnqueueReadBufferRect) stub_dlsym("clEnqueueReadBufferRect");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueReadBufferRect) dlsym(so_handle, "clEnqueueReadBufferRect");
   if(func) {
     return func(command_queue, buffer, blocking_read, buffer_offset, host_offset, region,
                 buffer_row_pitch, buffer_slice_pitch, host_row_pitch, host_slice_pitch, ptr,
@@ -1190,7 +1362,10 @@ clEnqueueWriteBuffer(cl_command_queue   command_queue,
 {
   f_clEnqueueWriteBuffer func;
 
-  func = (f_clEnqueueWriteBuffer) stub_dlsym("clEnqueueWriteBuffer");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueWriteBuffer) dlsym(so_handle, "clEnqueueWriteBuffer");
   if(func) {
     return func(command_queue, buffer, blocking_write, offset, size, ptr,
                 num_events_in_wait_list, event_wait_list, event);
@@ -1218,7 +1393,10 @@ clEnqueueWriteBufferRect(cl_command_queue    command_queue,
 {
   f_clEnqueueWriteBufferRect func;
 
-  func = (f_clEnqueueWriteBufferRect) stub_dlsym("clEnqueueWriteBufferRect");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueWriteBufferRect) dlsym(so_handle, "clEnqueueWriteBufferRect");
   if(func) {
     return func(command_queue, buffer, blocking_write, buffer_offset, host_offset, region,
                 buffer_row_pitch, buffer_slice_pitch, host_row_pitch, host_slice_pitch,
@@ -1242,7 +1420,10 @@ clEnqueueFillBuffer(cl_command_queue   command_queue,
 {
   f_clEnqueueFillBuffer func;
 
-  func = (f_clEnqueueFillBuffer) stub_dlsym("clEnqueueFillBuffer");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueFillBuffer) dlsym(so_handle, "clEnqueueFillBuffer");
   if(func) {
     return func(command_queue, buffer, pattern, pattern_size, offset, size,
                 num_events_in_wait_list, event_wait_list, event);
@@ -1264,7 +1445,10 @@ clEnqueueCopyBuffer(cl_command_queue    command_queue,
 {
   f_clEnqueueCopyBuffer func;
 
-  func = (f_clEnqueueCopyBuffer) stub_dlsym("clEnqueueCopyBuffer");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueCopyBuffer) dlsym(so_handle, "clEnqueueCopyBuffer");
   if(func) {
     return func(command_queue, src_buffer, dst_buffer, src_offset, dst_offset, size,
                 num_events_in_wait_list, event_wait_list, event);
@@ -1292,7 +1476,10 @@ clEnqueueCopyBufferRect(cl_command_queue    command_queue,
 {
   f_clEnqueueCopyBufferRect func;
 
-  func = (f_clEnqueueCopyBufferRect) stub_dlsym("clEnqueueCopyBufferRect");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueCopyBufferRect) dlsym(so_handle, "clEnqueueCopyBufferRect");
   if(func) {
     return func(command_queue, src_buffer, dst_buffer, src_origin, dst_origin, region, src_row_pitch,
                 src_slice_pitch, dst_row_pitch, dst_slice_pitch, num_events_in_wait_list, event_wait_list, event);
@@ -1316,7 +1503,10 @@ clEnqueueReadImage(cl_command_queue     command_queue,
 {
   f_clEnqueueReadImage func;
 
-  func = (f_clEnqueueReadImage) stub_dlsym("clEnqueueReadImage");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueReadImage) dlsym(so_handle, "clEnqueueReadImage");
   if(func) {
     return func(command_queue, image, blocking_read, origin, region, row_pitch, slice_pitch,
                 ptr, num_events_in_wait_list, event_wait_list, event);
@@ -1340,7 +1530,10 @@ clEnqueueWriteImage(cl_command_queue    command_queue,
 {
   f_clEnqueueWriteImage func;
 
-  func = (f_clEnqueueWriteImage) stub_dlsym("clEnqueueWriteImage");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueWriteImage) dlsym(so_handle, "clEnqueueWriteImage");
   if(func) {
     return func(command_queue, image, blocking_write, origin, region, input_row_pitch, input_slice_pitch, ptr,
                 num_events_in_wait_list, event_wait_list, event);
@@ -1362,7 +1555,10 @@ clEnqueueFillImage(cl_command_queue   command_queue,
 {
   f_clEnqueueFillImage func;
 
-  func = (f_clEnqueueFillImage) stub_dlsym("clEnqueueFillImage");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueFillImage) dlsym(so_handle, "clEnqueueFillImage");
   if(func) {
     return func(command_queue, image, fill_color, origin, region, num_events_in_wait_list, event_wait_list, event);
   } else {
@@ -1383,7 +1579,10 @@ clEnqueueCopyImage(cl_command_queue     command_queue,
 {
   f_clEnqueueCopyImage func;
 
-  func = (f_clEnqueueCopyImage) stub_dlsym("clEnqueueCopyImage");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueCopyImage) dlsym(so_handle, "clEnqueueCopyImage");
   if(func) {
     return func(command_queue, src_image, dst_image, src_origin, dst_origin, region,
                 num_events_in_wait_list, event_wait_list, event);
@@ -1405,7 +1604,10 @@ clEnqueueCopyImageToBuffer(cl_command_queue command_queue,
 {
   f_clEnqueueCopyImageToBuffer func;
 
-  func = (f_clEnqueueCopyImageToBuffer) stub_dlsym("clEnqueueCopyImageToBuffer");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueCopyImageToBuffer) dlsym(so_handle, "clEnqueueCopyImageToBuffer");
   if(func) {
     return func(command_queue, src_image, dst_buffer, src_origin, region, dst_offset,
                 num_events_in_wait_list, event_wait_list, event);
@@ -1428,7 +1630,10 @@ clEnqueueCopyBufferToImage(cl_command_queue command_queue,
 {
   f_clEnqueueCopyBufferToImage func;
 
-  func = (f_clEnqueueCopyBufferToImage) stub_dlsym("clEnqueueCopyBufferToImage");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueCopyBufferToImage) dlsym(so_handle, "clEnqueueCopyBufferToImage");
   if(func) {
     return func(command_queue, src_buffer, dst_image, src_offset, dst_origin, region,
                 num_events_in_wait_list, event_wait_list, event);
@@ -1451,12 +1656,15 @@ clEnqueueMapBuffer(cl_command_queue command_queue,
 {
   f_clEnqueueMapBuffer func;
 
-  func = (f_clEnqueueMapBuffer) stub_dlsym("clEnqueueMapBuffer");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueMapBuffer) dlsym(so_handle, "clEnqueueMapBuffer");
   if(func) {
     return func(command_queue, buffer, blocking_map, map_flags, offset, size,
                 num_events_in_wait_list, event_wait_list, event, errcode_ret);
   } else {
-    SET_ERR_RET_NULL();
+    return NULL;
   }
 }
 
@@ -1476,12 +1684,15 @@ clEnqueueMapImage(cl_command_queue  command_queue,
 {
   f_clEnqueueMapImage func;
 
-  func = (f_clEnqueueMapImage) stub_dlsym("clEnqueueMapImage");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueMapImage) dlsym(so_handle, "clEnqueueMapImage");
   if(func) {
     return func(command_queue, image, blocking_map, map_flags, origin, region, image_row_pitch,
                 image_slice_pitch, num_events_in_wait_list, event_wait_list, event, errcode_ret);
   } else {
-    SET_ERR_RET_NULL();
+    return NULL;
   }
 }
 
@@ -1495,7 +1706,10 @@ clEnqueueUnmapMemObject(cl_command_queue command_queue,
 {
   f_clEnqueueUnmapMemObject func;
 
-  func = (f_clEnqueueUnmapMemObject) stub_dlsym("clEnqueueUnmapMemObject");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueUnmapMemObject) dlsym(so_handle, "clEnqueueUnmapMemObject");
   if(func) {
     return func(command_queue, memobj, mapped_ptr, num_events_in_wait_list, event_wait_list, event);
   } else {
@@ -1514,7 +1728,10 @@ clEnqueueMigrateMemObjects(cl_command_queue       command_queue,
 {
   f_clEnqueueMigrateMemObjects func;
 
-  func = (f_clEnqueueMigrateMemObjects) stub_dlsym("clEnqueueMigrateMemObjects");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueMigrateMemObjects) dlsym(so_handle, "clEnqueueMigrateMemObjects");
   if(func) {
     return func(command_queue, num_mem_objects, mem_objects, flags, num_events_in_wait_list, event_wait_list, event);
   } else {
@@ -1535,7 +1752,10 @@ clEnqueueNDRangeKernel(cl_command_queue command_queue,
 {
   f_clEnqueueNDRangeKernel func;
 
-  func = (f_clEnqueueNDRangeKernel) stub_dlsym("clEnqueueNDRangeKernel");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueNDRangeKernel) dlsym(so_handle, "clEnqueueNDRangeKernel");
   if(func) {
     return func(command_queue, kernel, work_dim, global_work_offset, global_work_size, local_work_size,
                 num_events_in_wait_list, event_wait_list, event);
@@ -1553,7 +1773,10 @@ clEnqueueTask(cl_command_queue  command_queue,
 {
   f_clEnqueueTask func;
 
-  func = (f_clEnqueueTask) stub_dlsym("clEnqueueTask");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueTask) dlsym(so_handle, "clEnqueueTask");
   if(func) {
     return func(command_queue, kernel, num_events_in_wait_list, event_wait_list, event);
   } else {
@@ -1575,7 +1798,10 @@ clEnqueueNativeKernel(cl_command_queue  command_queue,
 {
   f_clEnqueueNativeKernel func;
 
-  func = (f_clEnqueueNativeKernel) stub_dlsym("clEnqueueNativeKernel");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueNativeKernel) dlsym(so_handle, "clEnqueueNativeKernel");
   if(func) {
     return func(command_queue, user_func, args, cb_args, num_mem_objects, mem_list,
                 args_mem_loc, num_events_in_wait_list, event_wait_list, event);
@@ -1592,7 +1818,10 @@ clEnqueueMarkerWithWaitList(cl_command_queue command_queue,
 {
   f_clEnqueueMarkerWithWaitList func;
 
-  func = (f_clEnqueueMarkerWithWaitList) stub_dlsym("clEnqueueMarkerWithWaitList");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueMarkerWithWaitList) dlsym(so_handle, "clEnqueueMarkerWithWaitList");
   if(func) {
     return func(command_queue, num_events_in_wait_list, event_wait_list, event);
   } else {
@@ -1608,7 +1837,10 @@ clEnqueueBarrierWithWaitList(cl_command_queue command_queue,
 {
   f_clEnqueueBarrierWithWaitList func;
 
-  func = (f_clEnqueueBarrierWithWaitList) stub_dlsym("clEnqueueBarrierWithWaitList");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueBarrierWithWaitList) dlsym(so_handle, "clEnqueueBarrierWithWaitList");
   if(func) {
     return func(command_queue, num_events_in_wait_list, event_wait_list, event);
   } else {
@@ -1622,7 +1854,10 @@ clGetExtensionFunctionAddressForPlatform(cl_platform_id platform,
 {
   f_clGetExtensionFunctionAddressForPlatform func;
 
-  func = (f_clGetExtensionFunctionAddressForPlatform) stub_dlsym("clGetExtensionFunctionAddressForPlatform");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clGetExtensionFunctionAddressForPlatform) dlsym(so_handle, "clGetExtensionFunctionAddressForPlatform");
   if(func) {
     return func(platform, func_name);
   } else {
@@ -1643,12 +1878,15 @@ clCreateImage2D(cl_context              context,
 {
   f_clCreateImage2D func;
 
-  func = (f_clCreateImage2D) stub_dlsym("clCreateImage2D");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clCreateImage2D) dlsym(so_handle, "clCreateImage2D");
   if(func) {
     return func(context, flags, image_format, image_width, image_height,
                 image_row_pitch, host_ptr, errcode_ret);
   } else {
-    SET_ERR_RET_NULL();
+    return NULL;
   }
 }
 
@@ -1666,12 +1904,15 @@ clCreateImage3D(cl_context              context,
 {
   f_clCreateImage3D func;
 
-  func = (f_clCreateImage3D) stub_dlsym("clCreateImage3D");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clCreateImage3D) dlsym(so_handle, "clCreateImage3D");
   if(func) {
     return func(context, flags, image_format, image_width, image_height, image_depth,
                 image_row_pitch, image_slice_pitch, host_ptr, errcode_ret);
   } else {
-    SET_ERR_RET_NULL();
+    return NULL;
   }
 }
 
@@ -1681,7 +1922,10 @@ clEnqueueMarker(cl_command_queue    command_queue,
 {
   f_clEnqueueMarker func;
 
-  func = (f_clEnqueueMarker) stub_dlsym("clEnqueueMarker");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueMarker) dlsym(so_handle, "clEnqueueMarker");
   if(func) {
     return func(command_queue, event);
   } else {
@@ -1696,7 +1940,10 @@ clEnqueueWaitForEvents(cl_command_queue command_queue,
 {
   f_clEnqueueWaitForEvents func;
 
-  func = (f_clEnqueueWaitForEvents) stub_dlsym("clEnqueueWaitForEvents");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueWaitForEvents) dlsym(so_handle, "clEnqueueWaitForEvents");
   if(func) {
     return func(command_queue, num_events, event_list);
   } else {
@@ -1709,7 +1956,10 @@ clEnqueueBarrier(cl_command_queue command_queue)
 {
   f_clEnqueueBarrier func;
 
-  func = (f_clEnqueueBarrier) stub_dlsym("clEnqueueBarrier");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueBarrier) dlsym(so_handle, "clEnqueueBarrier");
   if(func) {
     return func(command_queue);
   } else {
@@ -1722,7 +1972,10 @@ clUnloadCompiler(void)
 {
   f_clUnloadCompiler func;
 
-  func = (f_clUnloadCompiler) stub_dlsym("clUnloadCompiler");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clUnloadCompiler) dlsym(so_handle, "clUnloadCompiler");
   if(func) {
     return func();
   } else {
@@ -1735,7 +1988,10 @@ clGetExtensionFunctionAddress(const char * func_name)
 {
   f_clGetExtensionFunctionAddress func;
 
-  func = (f_clGetExtensionFunctionAddress) stub_dlsym("clGetExtensionFunctionAddress");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clGetExtensionFunctionAddress) dlsym(so_handle, "clGetExtensionFunctionAddress");
   if(func) {
     return func(func_name);
   } else {
@@ -1752,11 +2008,14 @@ clCreateFromGLBuffer(cl_context     context,
 {
   f_clCreateFromGLBuffer func;
 
-  func = (f_clCreateFromGLBuffer) stub_dlsym("clCreateFromGLBuffer");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clCreateFromGLBuffer) dlsym(so_handle, "clCreateFromGLBuffer");
   if(func) {
     return func(context, flags, bufobj, errcode_ret);
   } else {
-    SET_ERR_RET_NULL();
+    return NULL;
   }
 }
 
@@ -1770,11 +2029,14 @@ clCreateFromGLTexture(cl_context      context,
 {
   f_clCreateFromGLTexture func;
 
-  func = (f_clCreateFromGLTexture) stub_dlsym("clCreateFromGLTexture");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clCreateFromGLTexture) dlsym(so_handle, "clCreateFromGLTexture");
   if(func) {
     return func(context, flags, target, miplevel, texture, errcode_ret);
   } else {
-    SET_ERR_RET_NULL();
+    return NULL;
   }
 }
 
@@ -1786,11 +2048,14 @@ clCreateFromGLRenderbuffer(cl_context   context,
 {
   f_clCreateFromGLRenderbuffer func;
 
-  func = (f_clCreateFromGLRenderbuffer) stub_dlsym("clCreateFromGLRenderbuffer");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clCreateFromGLRenderbuffer) dlsym(so_handle, "clCreateFromGLRenderbuffer");
   if(func) {
     return func(context, flags, renderbuffer, errcode_ret);
   } else {
-    SET_ERR_RET_NULL();
+    return NULL;
   }
 }
 
@@ -1801,7 +2066,10 @@ clGetGLObjectInfo(cl_mem                memobj,
 {
   f_clGetGLObjectInfo func;
 
-  func = (f_clGetGLObjectInfo) stub_dlsym("clGetGLObjectInfo");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clGetGLObjectInfo) dlsym(so_handle, "clGetGLObjectInfo");
   if(func) {
     return func(memobj, gl_object_type, gl_object_name);
   } else {
@@ -1818,7 +2086,10 @@ clGetGLTextureInfo(cl_mem               memobj,
 {
   f_clGetGLTextureInfo func;
 
-  func = (f_clGetGLTextureInfo) stub_dlsym("clGetGLTextureInfo");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clGetGLTextureInfo) dlsym(so_handle, "clGetGLTextureInfo");
   if(func) {
     return func(memobj, param_name, param_value_size, param_value, param_value_size_ret);
   } else {
@@ -1836,7 +2107,10 @@ clEnqueueAcquireGLObjects(cl_command_queue      command_queue,
 {
   f_clEnqueueAcquireGLObjects func;
 
-  func = (f_clEnqueueAcquireGLObjects) stub_dlsym("clEnqueueAcquireGLObjects");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueAcquireGLObjects) dlsym(so_handle, "clEnqueueAcquireGLObjects");
   if(func) {
     return func(command_queue, num_objects, mem_objects, num_events_in_wait_list, event_wait_list, event);
   } else {
@@ -1854,7 +2128,10 @@ clEnqueueReleaseGLObjects(cl_command_queue      command_queue,
 {
   f_clEnqueueReleaseGLObjects func;
 
-  func = (f_clEnqueueReleaseGLObjects) stub_dlsym("clEnqueueReleaseGLObjects");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clEnqueueReleaseGLObjects) dlsym(so_handle, "clEnqueueReleaseGLObjects");
   if(func) {
     return func(command_queue, num_objects, mem_objects, num_events_in_wait_list, event_wait_list, event);
   } else {
@@ -1873,11 +2150,14 @@ clCreateFromGLTexture2D(cl_context      context,
 {
   f_clCreateFromGLTexture2D func;
 
-  func = (f_clCreateFromGLTexture2D) stub_dlsym("clCreateFromGLTexture2D");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clCreateFromGLTexture2D) dlsym(so_handle, "clCreateFromGLTexture2D");
   if(func) {
     return func(context, flags, target, miplevel, texture, errcode_ret);
   } else {
-    SET_ERR_RET_NULL();
+    return NULL;
   }
 }
 
@@ -1891,11 +2171,14 @@ clCreateFromGLTexture3D(cl_context      context,
 {
   f_clCreateFromGLTexture3D func;
 
-  func = (f_clCreateFromGLTexture3D) stub_dlsym("clCreateFromGLTexture3D");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clCreateFromGLTexture3D) dlsym(so_handle, "clCreateFromGLTexture3D");
   if(func) {
     return func(context, flags, target, miplevel, texture, errcode_ret);
   } else {
-    SET_ERR_RET_NULL();
+    return NULL;
   }
 }
 
@@ -1908,7 +2191,10 @@ clGetGLContextInfoKHR(const cl_context_properties * properties,
 {
   f_clGetGLContextInfoKHR func;
 
-  func = (f_clGetGLContextInfoKHR) stub_dlsym("clGetGLContextInfoKHR");
+  if(!so_handle)
+    open_libopencl_so();
+
+  func = (f_clGetGLContextInfoKHR) dlsym(so_handle, "clGetGLContextInfoKHR");
   if(func) {
     return func(properties, param_name, param_value_size, param_value, param_value_size_ret);
   } else {
