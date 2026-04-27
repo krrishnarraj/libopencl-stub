@@ -1,7 +1,9 @@
 #ifndef LIBOPENCL_STUB_H
 #define LIBOPENCL_STUB_H
 
-#define CL_TARGET_OPENCL_VERSION 120
+#ifndef CL_TARGET_OPENCL_VERSION
+#define CL_TARGET_OPENCL_VERSION 300
+#endif
 #include <CL/cl.h>
 #include <CL/cl_gl.h>
 
@@ -230,6 +232,70 @@ typedef cl_mem (*f_clCreateFromGLTexture3D) (cl_context, cl_mem_flags, cl_GLenum
 
 typedef cl_int (*f_clGetGLContextInfoKHR) (const cl_context_properties *, cl_gl_context_info, size_t,
                                         void *, size_t *);
+
+/* ========================================================================
+ * OpenCL 2.0
+ * ====================================================================== */
+#ifdef CL_VERSION_2_0
+typedef cl_mem (*f_clCreatePipe)(cl_context, cl_mem_flags, cl_uint, cl_uint,
+                                 const cl_pipe_properties *, cl_int *);
+typedef cl_int (*f_clGetPipeInfo)(cl_mem, cl_pipe_info, size_t, void *, size_t *);
+typedef void * (*f_clSVMAlloc)(cl_context, cl_svm_mem_flags, size_t, cl_uint);
+typedef void   (*f_clSVMFree)(cl_context, void *);
+typedef cl_int (*f_clEnqueueSVMFree)(cl_command_queue, cl_uint, void *[],
+                                     void (CL_CALLBACK *)(cl_command_queue, cl_uint, void *[], void *),
+                                     void *, cl_uint, const cl_event *, cl_event *);
+typedef cl_int (*f_clEnqueueSVMMemcpy)(cl_command_queue, cl_bool, void *, const void *,
+                                       size_t, cl_uint, const cl_event *, cl_event *);
+typedef cl_int (*f_clEnqueueSVMMemFill)(cl_command_queue, void *, const void *,
+                                        size_t, size_t, cl_uint, const cl_event *, cl_event *);
+typedef cl_int (*f_clEnqueueSVMMap)(cl_command_queue, cl_bool, cl_map_flags, void *,
+                                    size_t, cl_uint, const cl_event *, cl_event *);
+typedef cl_int (*f_clEnqueueSVMUnmap)(cl_command_queue, void *, cl_uint, const cl_event *, cl_event *);
+typedef cl_sampler (*f_clCreateSamplerWithProperties)(cl_context, const cl_sampler_properties *, cl_int *);
+typedef cl_int (*f_clSetKernelArgSVMPointer)(cl_kernel, cl_uint, const void *);
+typedef cl_int (*f_clSetKernelExecInfo)(cl_kernel, cl_kernel_exec_info, size_t, const void *);
+#endif
+
+/* ========================================================================
+ * OpenCL 2.1
+ * ====================================================================== */
+#ifdef CL_VERSION_2_1
+typedef cl_int (*f_clSetDefaultDeviceCommandQueue)(cl_context, cl_device_id, cl_command_queue);
+typedef cl_int (*f_clGetDeviceAndHostTimer)(cl_device_id, cl_ulong *, cl_ulong *);
+typedef cl_int (*f_clGetHostTimer)(cl_device_id, cl_ulong *);
+typedef cl_program (*f_clCreateProgramWithIL)(cl_context, const void *, size_t, cl_int *);
+typedef cl_kernel (*f_clCloneKernel)(cl_kernel, cl_int *);
+typedef cl_int (*f_clGetKernelSubGroupInfo)(cl_kernel, cl_device_id, cl_kernel_sub_group_info,
+                                            size_t, const void *, size_t, void *, size_t *);
+typedef cl_int (*f_clEnqueueSVMMigrateMem)(cl_command_queue, cl_uint, const void **,
+                                           const size_t *, cl_mem_migration_flags,
+                                           cl_uint, const cl_event *, cl_event *);
+#endif
+
+/* ========================================================================
+ * OpenCL 2.2
+ * ====================================================================== */
+#ifdef CL_VERSION_2_2
+typedef cl_int (*f_clSetProgramReleaseCallback)(cl_program,
+                                                void (CL_CALLBACK *)(cl_program, void *),
+                                                void *);
+typedef cl_int (*f_clSetProgramSpecializationConstant)(cl_program, cl_uint, size_t, const void *);
+#endif
+
+/* ========================================================================
+ * OpenCL 3.0
+ * ====================================================================== */
+#ifdef CL_VERSION_3_0
+typedef cl_mem (*f_clCreateBufferWithProperties)(cl_context, const cl_mem_properties *,
+                                                 cl_mem_flags, size_t, void *, cl_int *);
+typedef cl_mem (*f_clCreateImageWithProperties)(cl_context, const cl_mem_properties *,
+                                                cl_mem_flags, const cl_image_format *,
+                                                const cl_image_desc *, void *, cl_int *);
+typedef cl_int (*f_clSetContextDestructorCallback)(cl_context,
+                                                   void (CL_CALLBACK *)(cl_context, void *),
+                                                   void *);
+#endif
 
 // Additional api to reset currently opened opencl shared-object
 // Subsequent calls will use newly set environment variables
