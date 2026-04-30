@@ -75,22 +75,16 @@ static char errstr [88];
 
 #if defined(__APPLE__) || defined(__MACOSX)
 static const char *default_so_paths[] = {
-  "/System/Library/Frameworks/OpenCL.framework/OpenCL",
-  "libOpenCL.so"
+  "libOpenCL.dylib",
+  "/System/Library/Frameworks/OpenCL.framework/OpenCL"
 };
 #elif defined(__ANDROID__)
 static const char *default_so_paths[] = {
-  "/system/lib64/libOpenCL.so",
+  "libOpenCL.so",
   "/system/vendor/lib64/libOpenCL.so",
-  "/system/vendor/lib64/egl/libGLES_mali.so",
-  "/system/vendor/lib64/libPVROCL.so",
-  "/data/data/org.pocl.libs/files/lib64/libpocl.so",
-  "/system/lib/libOpenCL.so",
+  "/system/lib64/libOpenCL.so",
   "/system/vendor/lib/libOpenCL.so",
-  "/system/vendor/lib/egl/libGLES_mali.so",
-  "/system/vendor/lib/libPVROCL.so",
-  "/data/data/org.pocl.libs/files/lib/libpocl.so",
-  "libOpenCL.so"
+  "/system/lib/libOpenCL.so"
 };
 #elif defined(_WIN32) || defined(WINVER)
 static const char *default_so_paths[] = {
@@ -98,12 +92,12 @@ static const char *default_so_paths[] = {
 };
 #elif defined(__linux__)
 static const char *default_so_paths[] = {
+  "libOpenCL.so",
+  "libOpenCL.so.1",
   "/usr/lib/libOpenCL.so",
-  "/usr/local/lib/libOpenCL.so",
-  "/usr/local/lib/libpocl.so",
   "/usr/lib64/libOpenCL.so",
   "/usr/lib32/libOpenCL.so",
-  "libOpenCL.so"
+  "/usr/local/lib/libOpenCL.so"
 };
 #endif
 
